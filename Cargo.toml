@@ -1,0 +1,55 @@
+[package]
+name = "raccoon-otel"
+version = "1.0.0"
+edition = "2021"
+authors = ["Breno RdV"]
+description = "Drop-in OpenTelemetry bridge for Rust's tracing crate. One call to enable OTel export for tracing-based applications."
+repository = "https://github.com/brenordv/raccoon-otel"
+license = "MIT"
+readme = "readme.md"
+keywords = ["opentelemetry", "tracing", "observability", "otlp", "logging"]
+categories = ["development-tools::debugging", "development-tools::profiling"]
+
+[features]
+default = ["http", "traces", "logs", "rt-tokio"]
+
+# Transport
+grpc = ["opentelemetry-otlp/grpc-tonic"]
+http = ["opentelemetry-otlp/http-proto", "opentelemetry-otlp/reqwest-client"]
+
+# Signals (traces and logs on by default; metrics opt-in)
+traces = []
+logs = []
+metrics = [
+    "opentelemetry/metrics",
+    "opentelemetry_sdk/metrics",
+    "opentelemetry-otlp/metrics",
+    "tracing-opentelemetry/metrics",
+]
+
+# Compression
+gzip = ["opentelemetry-otlp/gzip-tonic"]
+zstd = ["opentelemetry-otlp/zstd-tonic"]
+
+# TLS
+tls = ["opentelemetry-otlp/tls-roots"]
+tls-webpki = ["opentelemetry-otlp/tls-webpki-roots"]
+
+# Async runtimes
+rt-tokio = ["opentelemetry_sdk/rt-tokio"]
+rt-tokio-current-thread = ["opentelemetry_sdk/rt-tokio-current-thread"]
+
+[dependencies]
+anyhow = "1"
+tracing = "0.1"
+tracing-core = "0.1"
+tracing-subscriber = { version = "0.3", features = ["registry", "std", "fmt", "env-filter"] }
+
+opentelemetry = { version = "0.31", default-features = false, features = ["trace", "logs"] }
+opentelemetry_sdk = { version = "0.31", default-features = false, features = ["trace", "logs"] }
+opentelemetry-otlp = { version = "0.31", default-features = false, features = ["trace", "logs"] }
+tracing-opentelemetry = { version = "0.32", default-features = false }
+opentelemetry-appender-tracing = "0.31"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full"] }

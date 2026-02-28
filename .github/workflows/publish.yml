@@ -1,0 +1,56 @@
+name: Publish to crates.io
+
+on:
+  push:
+    tags:
+      - "v*"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build
+      - run: cargo clippy -- -D warnings
+      - run: cargo fmt -- --check
+      - run: cargo test
+
+  version-check:
+    name: Verify tag matches Cargo.toml
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract versions
+        id: versions
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          CARGO_VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          echo "tag=$TAG_VERSION" >> "$GITHUB_OUTPUT"
+          echo "cargo=$CARGO_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Tag version: $TAG_VERSION"
+          echo "Cargo.toml version: $CARGO_VERSION"
+
+      - name: Check version match
+        run: |
+          if [ "${{ steps.versions.outputs.tag }}" != "${{ steps.versions.outputs.cargo }}" ]; then
+            echo "::error::Tag version (${{ steps.versions.outputs.tag }}) does not match Cargo.toml version (${{ steps.versions.outputs.cargo }})"
+            exit 1
+          fi
+
+  publish:
+    name: Publish
+    needs: [validate, version-check]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Publish to crates.io
+        run: cargo publish --token "${{ secrets.CRATES_IO_TOKEN }}"
