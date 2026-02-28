@@ -49,9 +49,10 @@ fn build_log_exporter(config: &ResolvedConfig) -> anyhow::Result<opentelemetry_o
         Protocol::HttpProtobuf | Protocol::HttpJson => {
             #[cfg(feature = "http")]
             {
+                let endpoint = format!("{}/v1/logs", config.endpoint.trim_end_matches('/'));
                 let exporter = opentelemetry_otlp::LogExporter::builder()
                     .with_http()
-                    .with_endpoint(&config.endpoint)
+                    .with_endpoint(endpoint)
                     .with_timeout(config.export_timeout)
                     .build()
                     .context("Failed to build HTTP log exporter")?;

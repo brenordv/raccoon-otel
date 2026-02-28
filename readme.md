@@ -24,6 +24,14 @@ I've created other packages that follow the same spirit:
 - [Python](https://github.com/nicholasgasior/log-factory-package-ext-otel)
 - [C#](https://github.com/nicholasgasior/raccoon-ninja-otel)
 
+## Try before you ~~buy~~ use!
+If you already have an open telemetry setup ready, and want to see this crate in action, you can try it out by running
+the demo application in the `demo` directory:
+```shell
+cd demo
+cargo run -- https://your-otlp-collector.com:4318
+```
+
 ## Installation
 
 Add to your `Cargo.toml`:

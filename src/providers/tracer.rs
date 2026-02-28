@@ -54,9 +54,10 @@ fn build_span_exporter(
         Protocol::HttpProtobuf | Protocol::HttpJson => {
             #[cfg(feature = "http")]
             {
+                let endpoint = format!("{}/v1/traces", config.endpoint.trim_end_matches('/'));
                 let exporter = opentelemetry_otlp::SpanExporter::builder()
                     .with_http()
-                    .with_endpoint(&config.endpoint)
+                    .with_endpoint(endpoint)
                     .with_timeout(config.export_timeout)
                     .build()
                     .context("Failed to build HTTP span exporter")?;

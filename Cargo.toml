@@ -15,7 +15,7 @@ default = ["http", "traces", "logs", "rt-tokio"]
 
 # Transport
 grpc = ["opentelemetry-otlp/grpc-tonic"]
-http = ["opentelemetry-otlp/http-proto", "opentelemetry-otlp/reqwest-client"]
+http = ["opentelemetry-otlp/http-proto", "opentelemetry-otlp/reqwest-blocking-client"]
 
 # Signals (traces and logs on by default; metrics opt-in)
 traces = []
