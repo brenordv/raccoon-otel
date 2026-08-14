@@ -109,6 +109,35 @@ export RUST_LOG=info,my_crate=debug
 let _guard = raccoon_otel::setup_otel("fallback-name", None)?;
 ```
 
+### With additional tracing layers
+
+Keep your own `tracing` layers (for example, a file writer) while still exporting to OpenTelemetry. `setup_otel_with_layers` composes them into the same subscriber, under the same `RUST_LOG` filter, as the stdout and OTel layers:
+
+```rust
+use raccoon_otel::BoxedLayer;
+use raccoon_otel::re_exports::tracing_subscriber::{self, Layer};
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let file = std::fs::File::create("app.log")?;
+    let file_layer: BoxedLayer = tracing_subscriber::fmt::layer()
+        .with_writer(file)
+        .with_ansi(false)
+        .boxed();
+
+    let _guard = raccoon_otel::setup_otel_with_layers(
+        "my-service",
+        None,
+        vec![file_layer],
+    )?;
+
+    tracing::info!("Goes to stdout, the file, AND the OTel backend");
+    Ok(())
+}
+```
+
+Each element is a `BoxedLayer`: a boxed `tracing_subscriber::Layer` over the global `Registry`. `tracing_subscriber` is re-exported (see [Re-exports](#re-exports)), so you get the version this crate aligns to without adding it to your own `Cargo.toml`; the `Layer` trait brought in above provides the `.boxed()` method. Passing an empty `vec![]` is equivalent to calling `setup_otel`.
+
 ## Configuration
 
 ### Priority order
@@ -223,12 +252,13 @@ raccoon-otel = { version = "1", default-features = false, features = [
 
 ```rust
 use raccoon_otel::re_exports::tracing;
+use raccoon_otel::re_exports::tracing_subscriber;
 use raccoon_otel::re_exports::opentelemetry;
 use raccoon_otel::re_exports::opentelemetry_sdk;
 use raccoon_otel::re_exports::tracing_opentelemetry;
 ```
 
-This is particularly useful for accessing span context extensions or the `opentelemetry::global` module without managing separate dependency entries.
+This is particularly useful for accessing span context extensions, the `opentelemetry::global` module, or `tracing_subscriber` layers (for [`setup_otel_with_layers`](#with-additional-tracing-layers)) without managing separate dependency entries.
 
 ## What gets exported
 
@@ -249,7 +279,7 @@ Every `tracing` event becomes an OTel log record. This includes:
 
 ### Console output
 
-`raccoon-otel` always adds a `fmt` layer to the subscriber, so all events also print to stdout with the standard `tracing_subscriber::fmt` format. You get both local console output and remote OTel export simultaneously.
+`raccoon-otel` always adds a `fmt` layer to the subscriber, so all events also print to stdout with the standard `tracing_subscriber::fmt` format. You get both local console output and remote OTel export simultaneously. To add more destinations (such as a log file) to the same subscriber, use [`setup_otel_with_layers`](#with-additional-tracing-layers).
 
 ### Log level filtering
 

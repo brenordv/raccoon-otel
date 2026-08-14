@@ -50,6 +50,15 @@ pub use options::{OtelOptions, OtelOptionsBuilder, Protocol};
 
 use anyhow::Context;
 
+/// A boxed [`tracing_subscriber::Layer`] over the global [`Registry`].
+///
+/// Pass a `Vec` of these to [`setup_otel_with_layers`] to add your own layers
+/// (for example a file writer) alongside the stdout and OTel layers.
+///
+/// [`Registry`]: tracing_subscriber::Registry
+pub type BoxedLayer =
+    Box<dyn tracing_subscriber::Layer<tracing_subscriber::Registry> + Send + Sync + 'static>;
+
 /// Initialize OpenTelemetry with the given service name and optional configuration.
 ///
 /// Sets up trace and log export pipelines, composes a global tracing subscriber
@@ -71,6 +80,27 @@ use anyhow::Context;
 /// - Provider or exporter initialization fails
 /// - The global tracing subscriber has already been set
 pub fn setup_otel(service_name: &str, options: Option<OtelOptions>) -> anyhow::Result<OtelGuard> {
+    setup_otel_with_layers(service_name, options, Vec::new())
+}
+
+/// Like [`setup_otel`], but also installs the caller-supplied `extra_layers`.
+///
+/// The extra layers are composed into the same global subscriber as the stdout
+/// and OTel layers, under the shared `RUST_LOG` env filter. Use this to keep
+/// application logging (for example a rotating file writer) while exporting to
+/// OpenTelemetry. Passing an empty `Vec` is equivalent to [`setup_otel`].
+///
+/// The returned [`OtelGuard`] **must** be held for the duration of the
+/// application; dropping it flushes and shuts down all providers.
+///
+/// # Errors
+///
+/// Returns an error under the same conditions as [`setup_otel`].
+pub fn setup_otel_with_layers(
+    service_name: &str,
+    options: Option<OtelOptions>,
+    extra_layers: Vec<BoxedLayer>,
+) -> anyhow::Result<OtelGuard> {
     let opts = options.unwrap_or_default();
     let resolved = env::resolve_config(service_name, &opts);
 
@@ -99,8 +129,12 @@ pub fn setup_otel(service_name: &str, options: Option<OtelOptions>) -> anyhow::R
         None
     };
 
-    subscriber::compose_subscriber(tracer_provider.as_ref(), logger_provider.as_ref())
-        .context("Failed to compose and set global subscriber")?;
+    subscriber::compose_subscriber(
+        tracer_provider.as_ref(),
+        logger_provider.as_ref(),
+        extra_layers,
+    )
+    .context("Failed to compose and set global subscriber")?;
 
     Ok(OtelGuard::new(tracer_provider, logger_provider))
 }
