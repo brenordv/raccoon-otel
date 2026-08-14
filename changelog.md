@@ -7,6 +7,7 @@
 
 ## Changed
 - The `RUST_LOG` env filter is now applied across the whole composed layer set, so any extra layers share the same level filtering as the stdout and OTel layers.
+- Bumped dependencies to their latest versions.
 
 `setup_otel` keeps the same signature and behavior; it now delegates to `setup_otel_with_layers` with no extra layers, so existing code is unaffected.
 
