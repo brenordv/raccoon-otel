@@ -1,7 +1,9 @@
 use opentelemetry_sdk::logs::SdkLoggerProvider;
 use opentelemetry_sdk::trace::SdkTracerProvider;
 use tracing_subscriber::prelude::*;
-use tracing_subscriber::EnvFilter;
+use tracing_subscriber::{EnvFilter, Layer};
+
+use crate::BoxedLayer;
 
 /// Compose and globally register a tracing subscriber with OTel layers.
 ///
@@ -10,6 +12,7 @@ use tracing_subscriber::EnvFilter;
 /// - `fmt` — formatted output to stdout
 /// - `OpenTelemetryLayer` — bridges tracing spans to OTel traces (if tracer provider given)
 /// - `OpenTelemetryTracingBridge` — bridges tracing events to OTel logs (if logger provider given)
+/// - any `extra_layers` supplied by the caller (e.g. a file writer)
 ///
 /// # Errors
 ///
@@ -17,24 +20,30 @@ use tracing_subscriber::EnvFilter;
 pub(crate) fn compose_subscriber(
     tracer_provider: Option<&SdkTracerProvider>,
     logger_provider: Option<&SdkLoggerProvider>,
+    extra_layers: Vec<BoxedLayer>,
 ) -> anyhow::Result<()> {
     let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
 
-    let fmt_layer = tracing_subscriber::fmt::layer().with_target(true);
+    let mut layers: Vec<BoxedLayer> = Vec::new();
 
-    let otel_trace_layer = tracer_provider.map(|tp| {
+    layers.push(tracing_subscriber::fmt::layer().with_target(true).boxed());
+
+    if let Some(tp) = tracer_provider {
         use opentelemetry::trace::TracerProvider as _;
-        tracing_opentelemetry::layer().with_tracer(tp.tracer("raccoon-otel"))
-    });
+        let otel_trace_layer =
+            tracing_opentelemetry::layer().with_tracer(tp.tracer("raccoon-otel"));
+        layers.push(otel_trace_layer.boxed());
+    }
 
-    let otel_log_layer =
-        logger_provider.map(opentelemetry_appender_tracing::layer::OpenTelemetryTracingBridge::new);
+    if let Some(lp) = logger_provider {
+        let otel_log_layer =
+            opentelemetry_appender_tracing::layer::OpenTelemetryTracingBridge::new(lp);
+        layers.push(otel_log_layer.boxed());
+    }
 
-    let subscriber = tracing_subscriber::registry()
-        .with(env_filter)
-        .with(fmt_layer)
-        .with(otel_trace_layer)
-        .with(otel_log_layer);
+    layers.extend(extra_layers);
+
+    let subscriber = tracing_subscriber::registry().with(layers.with_filter(env_filter));
 
     tracing::subscriber::set_global_default(subscriber)
         .map_err(|e| anyhow::anyhow!("Failed to set global subscriber: {e}"))?;

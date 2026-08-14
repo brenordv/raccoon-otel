@@ -1,6 +1,6 @@
 [package]
 name = "raccoon-otel"
-version = "1.0.0"
+version = "1.1.0"
 edition = "2021"
 authors = ["Breno RdV"]
 description = "Drop-in OpenTelemetry bridge for Rust's tracing crate. One call to enable OTel export for tracing-based applications."
